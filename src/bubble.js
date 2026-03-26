@@ -64,7 +64,7 @@ export function createBubble(text, engine) {
     font-family: ${inputStyle.fontFamily};
     font-weight: ${inputStyle.fontWeight};
     letter-spacing: ${inputStyle.letterSpacing};
-    max-width: ${areaRect.width * 0.6}px;
+    max-width: ${inputRect.width}px;
     word-wrap: break-word;
     white-space: pre-wrap;
     pointer-events: none;
@@ -97,7 +97,7 @@ export function createBubble(text, engine) {
 
   // Matter.js body — 처음부터 동적, 역중력으로 바로 떠오름
   const body = Bodies.rectangle(startX, startY, w, h, {
-    chamfer: { radius: Math.min(w, h) / 2 },
+    chamfer: { radius: Math.min(parseInt(inputStyle.borderRadius) || 26, Math.min(w, h) / 2) },
     restitution: 0.3,
     friction: 0.05,
     frictionAir: 0.02,

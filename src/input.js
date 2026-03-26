@@ -1,7 +1,25 @@
 // 입력 처리 모듈
+const PILL_RADIUS = '26px';
+const RECT_RADIUS = '18px';
+
 export function initInput(onSend) {
   const input = document.getElementById('message-input');
   const sendBtn = document.getElementById('send-btn');
+
+  // 초기 한 줄 높이를 실측
+  const singleLineHeight = input.scrollHeight;
+
+  // textarea 높이 자동 조절
+  function autoResize() {
+    input.style.height = 'auto';
+    const sh = input.scrollHeight;
+    input.style.height = Math.min(sh, 200) + 'px';
+    // 한 줄이면 pill, 여러 줄이면 rounded rect
+    const lines = Math.round(sh / singleLineHeight);
+    input.style.borderRadius = lines > 2 ? RECT_RADIUS : PILL_RADIUS;
+  }
+
+  input.addEventListener('input', autoResize);
 
   function handleSend() {
     const text = input.value.trim();
@@ -10,11 +28,12 @@ export function initInput(onSend) {
     input.style.transform = 'scale(0.96)';
     onSend(text);
     input.value = '';
+    autoResize();
     setTimeout(() => { input.style.transform = ''; }, 50);
   }
 
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }

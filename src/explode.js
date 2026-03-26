@@ -2,8 +2,9 @@
 import { Body } from 'matter-js';
 import { getBubbles } from './bubble.js';
 
-const EXPLODE_RADIUS = 300;
-const EXPLODE_FORCE = 0.08;
+const IS_MOBILE = 'ontouchstart' in window;
+const EXPLODE_RADIUS = IS_MOBILE ? 200 : 300;
+const EXPLODE_FORCE = IS_MOBILE ? 0.04 : 0.08;
 
 export function initExplode() {
   const area = document.getElementById('bubble-area');

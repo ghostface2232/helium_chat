@@ -37,7 +37,7 @@ body {
 
 #message-input {
   flex: 1;
-  border-radius: 9999px;
+  border-radius: 26px;
   border: none;
   padding: 14px 20px;
   font-size: 18px;
@@ -50,7 +50,11 @@ body {
   color: #e5e5e5;
   position: relative;
   z-index: 1;
-  transition: transform 50ms ease-out;
+  resize: none;
+  overflow: hidden;
+  min-height: 52px;
+  max-height: 200px;
+  transition: transform 50ms ease-out, border-radius 150ms ease;
 }
 
 #message-input::placeholder {
