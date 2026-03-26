@@ -12,9 +12,18 @@ startRenderLoop();
 
 let currentWalls = walls;
 let resizeTimer = null;
-// 초기 뷰포트 크기 기록 — 키보드에 의한 높이 축소를 무시하기 위해 사용
-let lastWidth = document.getElementById('bubble-area').clientWidth;
-let maxHeight = document.getElementById('bubble-area').clientHeight;
+
+// 텍스트 입력 포커스 중 높이만 줄어드는 리사이즈는 모바일 키보드로 간주
+function isKeyboardResize(w, h) {
+  const area = document.getElementById('bubble-area');
+  const prevW = area.dataset.prevWidth ? Number(area.dataset.prevWidth) : w;
+  const prevH = area.dataset.prevHeight ? Number(area.dataset.prevHeight) : h;
+  const widthSame = w === prevW;
+  const heightShrunk = h < prevH;
+  const inputFocused = document.activeElement &&
+    (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT');
+  return widthSame && heightShrunk && inputFocused;
+}
 
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
@@ -23,12 +32,12 @@ window.addEventListener('resize', () => {
     const w = area.clientWidth;
     const h = area.clientHeight;
 
-    // 높이가 이전 최대값보다 커지면 갱신 (화면 회전 등)
-    if (h > maxHeight) maxHeight = h;
-
-    // 너비 변경 없고 높이가 줄어든 경우(키보드 팝업) → 벽 재생성 건너뜀
-    if (w === lastWidth && h < maxHeight) return;
-    lastWidth = w;
+    // 모바일 키보드에 의한 높이 축소 → 물리 월드 변경 건너뜀
+    if (isKeyboardResize(w, h)) {
+      return;
+    }
+    area.dataset.prevWidth = w;
+    area.dataset.prevHeight = h;
 
     currentWalls = resizePhysics(engine, currentWalls);
 
