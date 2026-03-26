@@ -6,29 +6,59 @@ import { startRenderLoop } from './render-loop.js';
 import { initExplode } from './explode.js';
 import { Body } from 'matter-js';
 
+const KEYBOARD_THRESHOLD = 120;
+
 const { engine, walls } = initPhysics();
 startPhysics(engine);
 startRenderLoop();
 
 let currentWalls = walls;
 let resizeTimer = null;
+let baselineLayoutHeight = window.innerHeight;
+
+function clampBubblesIntoBounds() {
+  const area = document.getElementById('bubble-area');
+  const w = area.clientWidth;
+  const h = area.clientHeight;
+
+  for (const bubble of getBubbles()) {
+    const { body, width, height } = bubble;
+    const x = Math.max(width / 2, Math.min(w - width / 2, body.position.x));
+    const y = Math.max(height / 2, Math.min(h - height / 2, body.position.y));
+
+    if (x !== body.position.x || y !== body.position.y) {
+      Body.setPosition(body, { x, y });
+    }
+  }
+}
+
+function syncPhysicsBounds() {
+  currentWalls = resizePhysics(engine, currentWalls);
+  clampBubblesIntoBounds();
+}
+
+function getKeyboardInset() {
+  if (!window.visualViewport) return 0;
+  return Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
+}
+
+function isKeyboardOpen() {
+  if (!window.visualViewport) return false;
+
+  const keyboardDelta = baselineLayoutHeight - (window.visualViewport.height + window.visualViewport.offsetTop);
+  return keyboardDelta > KEYBOARD_THRESHOLD;
+}
+
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
-    currentWalls = resizePhysics(engine, currentWalls);
-
-    // 경계 밖 버블을 안쪽으로 보정
-    const area = document.getElementById('bubble-area');
-    const w = area.clientWidth;
-    const h = area.clientHeight;
-    for (const bubble of getBubbles()) {
-      const { body, width, height } = bubble;
-      const x = Math.max(width / 2, Math.min(w - width / 2, body.position.x));
-      const y = Math.max(height / 2, Math.min(h - height / 2, body.position.y));
-      if (x !== body.position.x || y !== body.position.y) {
-        Body.setPosition(body, { x, y });
-      }
+    // 키보드에 의한 시각 뷰포트 축소는 물리 월드 경계 변경에서 제외
+    if (isKeyboardOpen()) {
+      return;
     }
+
+    baselineLayoutHeight = window.innerHeight;
+    syncPhysicsBounds();
   }, 200);
 });
 
@@ -38,37 +68,21 @@ initInput((text) => {
 
 initExplode();
 
-// iOS Safari 소프트 키보드 대응
+// 소프트 키보드 대응: 입력바만 키보드 상단으로 올리고 물리 천장은 고정 유지
 if (window.visualViewport) {
   const inputBar = document.getElementById('input-bar');
-  function onViewportResize() {
-    const offset = window.innerHeight - visualViewport.height;
-    inputBar.style.bottom = offset + 'px';
 
-    const vpHeight = visualViewport.height;
-    const vpTop = visualViewport.offsetTop;
+  function onViewportChange() {
+    const keyboardInset = getKeyboardInset();
+    inputBar.style.transform = keyboardInset > 0 ? `translateY(-${keyboardInset}px)` : '';
 
-    // 키보드에 맞춰 천장/벽 재배치
-    currentWalls = resizePhysics(engine, currentWalls, {
-      height: vpHeight,
-      offsetTop: vpTop
-    });
-
-    // 경계 밖 버블을 새 영역 안으로 보정 + 속도 초기화 (키보드 반복 시 누적 가속 방지)
-    const area = document.getElementById('bubble-area');
-    const w = area.clientWidth;
-    for (const bubble of getBubbles()) {
-      const { body, width, height } = bubble;
-      const minY = vpTop + height / 2;
-      const maxY = vpTop + vpHeight - height / 2;
-      const x = Math.max(width / 2, Math.min(w - width / 2, body.position.x));
-      const y = Math.max(minY, Math.min(maxY, body.position.y));
-      if (x !== body.position.x || y !== body.position.y) {
-        Body.setPosition(body, { x, y });
-        Body.setVelocity(body, { x: 0, y: 0 });
-      }
+    // 키보드가 닫힌 안정 상태에서만 기준 높이 갱신
+    if (!isKeyboardOpen()) {
+      baselineLayoutHeight = window.innerHeight;
     }
   }
-  visualViewport.addEventListener('resize', onViewportResize);
-  visualViewport.addEventListener('scroll', onViewportResize);
+
+  visualViewport.addEventListener('resize', onViewportChange);
+  visualViewport.addEventListener('scroll', onViewportChange);
+  onViewportChange();
 }
