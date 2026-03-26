@@ -5,12 +5,36 @@ const bubbles = [];
 
 const MORPH_DURATION = 400; // 입력창→버블 색상 전환 시간(ms)
 
-// HSL 랜덤 배경색 생성 (흰색 텍스트가 잘 읽히는 범위)
+// 채도 높아 보이는 hue 대역 (탁해 보이는 노랑~황녹 제외)
+const VIVID_HUES = [
+  [0, 30],     // 빨강~주황
+  [270, 360],  // 보라~마젠타
+  [180, 260],  // 시안~파랑
+  [70, 170],   // 초록~청록
+  [30, 70],    // 주황~연두
+];
+const HUE_RANGES = VIVID_HUES.flat();
+let lastHue = -1;
+const MIN_HUE_SHIFT = 60;
+
 function randomColor() {
-  const h = Math.random() * 360;
-  const s = 60 + Math.random() * 15;
-  const l = 42 + Math.random() * 13;
-  return `hsl(${h}, ${s}%, ${l}%)`;
+  // vivid 대역에서 랜덤 hue 선택
+  const range = VIVID_HUES[Math.floor(Math.random() * VIVID_HUES.length)];
+  let h = range[0] + Math.random() * (range[1] - range[0]);
+
+  // 이전 hue와 최소 거리 보장
+  if (lastHue >= 0) {
+    let dist = Math.abs(h - lastHue);
+    if (dist > 180) dist = 360 - dist;
+    if (dist < MIN_HUE_SHIFT) {
+      h = (lastHue + MIN_HUE_SHIFT + Math.random() * (360 - 2 * MIN_HUE_SHIFT)) % 360;
+    }
+  }
+  lastHue = h;
+
+  const s = 80 + Math.random() * 20;
+  const l = 42 + Math.random() * 10;
+  return { h, s, l };
 }
 
 // 버블 생성: 입력창 위에 겹쳐서 나타난 뒤 색이 변하며 떠오름
@@ -20,7 +44,9 @@ export function createBubble(text, engine) {
   const input = document.getElementById('message-input');
   const inputRect = input.getBoundingClientRect();
 
-  const color = randomColor();
+  const { h: hue, s, l } = randomColor();
+  const color = `hsl(${hue}, ${s}%, ${l}%)`;
+  const glow = `hsla(${hue}, ${s}%, ${l}%, 0.35)`;
 
   // DOM 요소 생성 — 처음에는 입력창과 동일한 외형
   const el = document.createElement('div');
@@ -56,10 +82,10 @@ export function createBubble(text, engine) {
     background: ${inputBg};
     color: ${inputColor};
     border: 1px solid ${inputBorder};
-    animation: bubble-appear 200ms ease-out;
-    transition: background ${MORPH_DURATION}ms ease,
-                color ${MORPH_DURATION}ms ease,
-                border-color ${MORPH_DURATION}ms ease;
+    transition: background 800ms cubic-bezier(0.25, 0.1, 0.25, 1),
+                color 800ms cubic-bezier(0.25, 0.1, 0.25, 1),
+                border-color 800ms cubic-bezier(0.25, 0.1, 0.25, 1),
+                box-shadow 800ms cubic-bezier(0.25, 0.1, 0.25, 1);
     visibility: hidden;
   `;
 
@@ -74,7 +100,7 @@ export function createBubble(text, engine) {
 
   // Matter.js body — 처음부터 동적, 역중력으로 바로 떠오름
   const body = Bodies.rectangle(startX, startY, w, h, {
-    chamfer: { radius: 24 },
+    chamfer: { radius: Math.min(w, h) / 2 },
     restitution: 0.3,
     friction: 0.05,
     frictionAir: 0.02,
@@ -92,6 +118,7 @@ export function createBubble(text, engine) {
     el.style.background = color;
     el.style.color = '#fff';
     el.style.borderColor = 'transparent';
+    el.style.boxShadow = `0 0 12px 3px ${glow}`;
   });
 
   const bubble = {
@@ -103,10 +130,6 @@ export function createBubble(text, engine) {
   };
   bubbles.push(bubble);
 
-  // 전환 완료 후 테두리 제거
-  setTimeout(() => {
-    el.style.border = 'none';
-  }, MORPH_DURATION);
 
   return bubble;
 }
