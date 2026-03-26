@@ -1,3 +1,17 @@
+@font-face {
+  font-family: 'SF Pro KR';
+  src: url('/SFProKR-Medium.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SF Pro KR';
+  src: url('/SFProKR-Semibold.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -11,7 +25,7 @@ html, body, #app {
 
 body {
   background-color: #000;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'SF Pro KR', system-ui, -apple-system, sans-serif;
   color: #e5e5e5;
 }
 
@@ -42,7 +56,7 @@ body {
   padding: 14px 20px;
   font-size: 18px;
   line-height: 1.4;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'SF Pro KR', system-ui, -apple-system, sans-serif;
   font-weight: 400;
   letter-spacing: normal;
   outline: none;
