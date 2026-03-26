@@ -7,34 +7,13 @@ import { initExplode } from './explode.js';
 import { Body } from 'matter-js';
 
 const KEYBOARD_THRESHOLD = 100;
-const KEYBOARD_LOCK_INSET = 24;
-const ORIENTATION_WIDTH_DELTA = 120;
-const VIEWPORT_SYNC_DEBOUNCE = 150;
+const VIEWPORT_SYNC_DEBOUNCE = 120;
 
-const { engine, walls } = initPhysics();
-startPhysics(engine);
-startRenderLoop();
-
-let currentWalls = walls;
-let resizeTimer = null;
-let viewportSyncTimer = null;
-
-let stableLayoutWidth = getLayoutWidth();
-let stableLayoutHeight = getLayoutHeight();
-let maxObservedLayoutHeight = stableLayoutHeight;
-let keyboardLockActive = false;
-
-// 키보드가 닫힌 상태에서의 visual viewport 기준값
-let keyboardReferenceHeight = window.visualViewport
-  ? window.visualViewport.height + window.visualViewport.offsetTop
-  : stableLayoutHeight;
-
-function getLayoutWidth() {
-  return document.documentElement.clientWidth || window.innerWidth;
-}
-
-function getLayoutHeight() {
-  return document.documentElement.clientHeight || window.innerHeight;
+function getViewportSize() {
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  };
 }
 
 function isEditableFocused() {
@@ -45,95 +24,43 @@ function isEditableFocused() {
   return tag === 'TEXTAREA' || tag === 'INPUT' || active.isContentEditable;
 }
 
-function shouldFreezeLayoutForKeyboard(orientationChanged = false) {
-  // 입력 요소에 포커스가 있는 동안에는 키보드 세션으로 간주해 레이아웃을 고정한다.
-  // 단, 회전(가로폭 급변) 시에는 월드 재계산을 허용한다.
-  return keyboardLockActive && !orientationChanged;
-}
+let stableViewport = getViewportSize();
+const { engine, walls } = initPhysics(stableViewport);
+startPhysics(engine);
+startRenderLoop();
 
-function updateKeyboardLockState() {
-  const activeInput = isEditableFocused();
-  if (!activeInput) {
-    keyboardLockActive = false;
-    return;
-  }
+let currentWalls = walls;
+let resizeTimer = null;
+let viewportSyncTimer = null;
 
-  if (!window.visualViewport) {
-    keyboardLockActive = getLayoutHeight() < maxObservedLayoutHeight - KEYBOARD_LOCK_INSET;
-    return;
-  }
+// 키보드가 닫혀 있을 때의 visualViewport 하단 좌표를 기준점으로 유지
+let keyboardReferenceBottom = window.visualViewport
+  ? window.visualViewport.height + window.visualViewport.offsetTop
+  : stableViewport.height;
 
-  const viewportBottom = window.visualViewport.height + window.visualViewport.offsetTop;
-  const insetFromReference = Math.max(0, keyboardReferenceHeight - viewportBottom);
-  const insetFromStable = Math.max(0, stableLayoutHeight - viewportBottom);
-  const compressedViewport = window.visualViewport.height < keyboardReferenceHeight - KEYBOARD_LOCK_INSET;
-
-  keyboardLockActive = (
-    insetFromReference > KEYBOARD_LOCK_INSET ||
-    insetFromStable > KEYBOARD_LOCK_INSET ||
-    compressedViewport ||
-    window.visualViewport.offsetTop > 0
-  );
-}
-
-function getKeyboardInsetFromReference() {
+function getKeyboardInset() {
   if (!window.visualViewport) return 0;
-
   const viewportBottom = window.visualViewport.height + window.visualViewport.offsetTop;
-  return Math.max(0, keyboardReferenceHeight - viewportBottom);
+  return Math.max(0, keyboardReferenceBottom - viewportBottom);
 }
 
 function isKeyboardOpen() {
   if (!window.visualViewport) {
-    const currentHeight = getLayoutHeight();
-    const shrunkFromMax = currentHeight < maxObservedLayoutHeight - KEYBOARD_THRESHOLD;
-    return isEditableFocused() && shrunkFromMax;
+    return isEditableFocused() && (window.innerHeight < stableViewport.height - KEYBOARD_THRESHOLD);
   }
 
-  const activeInput = isEditableFocused();
-  const insetFromReference = getKeyboardInsetFromReference();
-  const insetFromStable = Math.max(
-    0,
-    stableLayoutHeight - (window.visualViewport.height + window.visualViewport.offsetTop),
-  );
-  const compressedViewport =
-    window.visualViewport.height < keyboardReferenceHeight - KEYBOARD_THRESHOLD;
-
-  // iOS Safari는 키보드 열림 시 offsetTop이 함께 변하는 경우가 있어 함께 체크
-  const shiftedViewport = window.visualViewport.offsetTop > 0;
-
-  return activeInput && (
-    insetFromReference > KEYBOARD_THRESHOLD ||
-    insetFromStable > KEYBOARD_THRESHOLD ||
-    compressedViewport ||
-    shiftedViewport
-  );
-}
-
-function applyStableAppHeight(height) {
-  document.documentElement.style.setProperty('--stable-app-height', `${height}px`);
-}
-
-function commitStableViewport(width, height) {
-  stableLayoutWidth = width;
-  stableLayoutHeight = height;
-
-  if (window.visualViewport || !isEditableFocused()) {
-    maxObservedLayoutHeight = Math.max(maxObservedLayoutHeight, height);
-  }
-
-  applyStableAppHeight(height);
+  const keyboardInset = getKeyboardInset();
+  const compressedViewport = window.visualViewport.height < keyboardReferenceBottom - KEYBOARD_THRESHOLD;
+  return isEditableFocused() && (keyboardInset > KEYBOARD_THRESHOLD || compressedViewport);
 }
 
 function clampBubblesIntoBounds() {
-  const area = document.getElementById('bubble-area');
-  const w = area.clientWidth;
-  const h = area.clientHeight;
+  const { width, height } = stableViewport;
 
   for (const bubble of getBubbles()) {
-    const { body, width, height } = bubble;
-    const x = Math.max(width / 2, Math.min(w - width / 2, body.position.x));
-    const y = Math.max(height / 2, Math.min(h - height / 2, body.position.y));
+    const { body, width: bubbleWidth, height: bubbleHeight } = bubble;
+    const x = Math.max(bubbleWidth / 2, Math.min(width - bubbleWidth / 2, body.position.x));
+    const y = Math.max(bubbleHeight / 2, Math.min(height - bubbleHeight / 2, body.position.y));
 
     if (x !== body.position.x || y !== body.position.y) {
       Body.setPosition(body, { x, y });
@@ -142,72 +69,44 @@ function clampBubblesIntoBounds() {
 }
 
 function syncPhysicsBounds() {
-  currentWalls = resizePhysics(engine, currentWalls);
+  currentWalls = resizePhysics(engine, currentWalls, stableViewport);
   clampBubblesIntoBounds();
 }
 
-function updateKeyboardReferenceIfStable(orientationChanged = false) {
-  if (!window.visualViewport) {
-    if (orientationChanged) {
-      // 회전/대규모 가로폭 변경 시 no-visualViewport 기준 높이를 재설정
-      maxObservedLayoutHeight = stableLayoutHeight;
-      return;
-    }
-
-    if (!isEditableFocused()) {
-      maxObservedLayoutHeight = Math.max(maxObservedLayoutHeight, getLayoutHeight());
-    }
-    return;
-  }
-
-  if (isKeyboardOpen() || isEditableFocused()) return;
-
-  keyboardReferenceHeight = window.visualViewport.height + window.visualViewport.offsetTop;
-}
-
-function syncViewportAndPhysics() {
-  updateKeyboardLockState();
-
-  const width = getLayoutWidth();
-  const height = getLayoutHeight();
-  const widthDelta = Math.abs(width - stableLayoutWidth);
-  const orientationChanged = widthDelta >= ORIENTATION_WIDTH_DELTA;
-
-  // 소프트 키보드 중에는 물리 월드 경계를 절대 갱신하지 않는다
-  if (isKeyboardOpen() || shouldFreezeLayoutForKeyboard(orientationChanged)) {
-    return;
-  }
-
-  const sizeChanged = width !== stableLayoutWidth || height !== stableLayoutHeight;
-  if (!sizeChanged) {
-    updateKeyboardReferenceIfStable(orientationChanged);
-    return;
-  }
-
-  // 모바일 브라우저 UI 변화(주소창 show/hide)로 인한 미세 흔들림 억제
-  if (!orientationChanged && Math.abs(height - stableLayoutHeight) < KEYBOARD_THRESHOLD / 2 && widthDelta === 0) {
-    updateKeyboardReferenceIfStable(orientationChanged);
-    return;
-  }
-
-  commitStableViewport(width, height);
-  updateKeyboardReferenceIfStable(orientationChanged);
+function commitStableViewport(nextViewport) {
+  stableViewport = nextViewport;
   syncPhysicsBounds();
 }
 
-commitStableViewport(stableLayoutWidth, stableLayoutHeight);
+function syncViewportAndPhysics() {
+  const nextViewport = getViewportSize();
+  const sizeChanged = (
+    nextViewport.width !== stableViewport.width ||
+    nextViewport.height !== stableViewport.height
+  );
 
-document.addEventListener('focusin', () => {
-  if (!isEditableFocused()) return;
-  keyboardLockActive = false;
-  updateKeyboardLockState();
-});
+  if (!sizeChanged) {
+    if (window.visualViewport && !isEditableFocused()) {
+      keyboardReferenceBottom = window.visualViewport.height + window.visualViewport.offsetTop;
+    }
+    return;
+  }
+
+  // 키보드 세션에서는 벽을 절대 재배치하지 않는다
+  if (isKeyboardOpen()) {
+    return;
+  }
+
+  commitStableViewport(nextViewport);
+
+  if (window.visualViewport && !isEditableFocused()) {
+    keyboardReferenceBottom = window.visualViewport.height + window.visualViewport.offsetTop;
+  }
+}
 
 document.addEventListener('focusout', () => {
-  // blur 직후에는 다음 입력으로 포커스가 이동할 수 있어 한 프레임 뒤 상태를 확인
   requestAnimationFrame(() => {
     if (!isEditableFocused()) {
-      keyboardLockActive = false;
       syncViewportAndPhysics();
     }
   });
@@ -215,7 +114,7 @@ document.addEventListener('focusout', () => {
 
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(syncViewportAndPhysics, 180);
+  resizeTimer = setTimeout(syncViewportAndPhysics, 120);
 });
 
 initInput((text) => {
@@ -224,21 +123,18 @@ initInput((text) => {
 
 initExplode();
 
-// 소프트 키보드 대응: 입력바만 키보드 상단으로 올리고 물리 천장은 고정 유지
+// 소프트 키보드 대응: 입력바만 키보드 상단으로 이동, 물리 월드는 고정
 if (window.visualViewport) {
   const inputBar = document.getElementById('input-bar');
 
   function onViewportChange() {
-    updateKeyboardLockState();
-
-    const keyboardInset = getKeyboardInsetFromReference();
+    const keyboardInset = getKeyboardInset();
     inputBar.style.transform = keyboardInset > 0 ? `translateY(-${keyboardInset}px)` : '';
 
     clearTimeout(viewportSyncTimer);
     viewportSyncTimer = setTimeout(() => {
       if (!isKeyboardOpen() && !isEditableFocused()) {
-        keyboardLockActive = false;
-        keyboardReferenceHeight = window.visualViewport.height + window.visualViewport.offsetTop;
+        keyboardReferenceBottom = window.visualViewport.height + window.visualViewport.offsetTop;
       }
       syncViewportAndPhysics();
     }, VIEWPORT_SYNC_DEBOUNCE);
