@@ -17,18 +17,17 @@ export function initInput(onSend) {
     }
   }
 
-  // 초기 한 줄 높이를 실측 → 이 값의 절반을 항상 borderRadius로 사용
-  const pillRadius = input.scrollHeight / 2;
-
   // textarea 높이 자동 조절
   function autoResize() {
     input.style.height = 'auto';
     const sh = input.scrollHeight;
     input.style.height = Math.min(sh, 200) + 'px';
-    input.style.borderRadius = pillRadius + 'px';
   }
 
   input.addEventListener('input', autoResize);
+
+  // 초기 진입 시 높이를 콘텐츠 기준으로 동기화
+  autoResize();
 
   function handleSend() {
     const text = input.value.trim();

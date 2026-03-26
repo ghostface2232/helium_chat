@@ -113,7 +113,7 @@ body {
   overflow: hidden;
   min-height: 52px;
   max-height: 200px;
-  transition: transform 50ms ease-out, border-radius 150ms ease;
+  transition: transform 50ms ease-out;
 }
 
 #message-input::placeholder {
@@ -144,4 +144,3 @@ body {
 #send-btn:hover {
   background-color: #444;
 }
-
