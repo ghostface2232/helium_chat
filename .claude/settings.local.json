@@ -13,7 +13,8 @@
       "Bash(cmd //c \"mklink CLAUDE.md AGENTS.md\")",
       "Bash(export MSYS=winsymlinks:nativestrict)",
       "Bash(powershell -Command \"New-Item -ItemType SymbolicLink -Path 'C:\\\\Users\\\\WellCalm\\\\Documents\\\\00_AI\\\\helium_chat\\\\CLAUDE.md' -Target 'C:\\\\Users\\\\WellCalm\\\\Documents\\\\00_AI\\\\helium_chat\\\\AGENTS.md'\")",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(curl:*)"
     ]
   }
 }

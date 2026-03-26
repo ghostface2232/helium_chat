@@ -3,6 +3,8 @@ import { Bodies, Body, World } from 'matter-js';
 
 const bubbles = [];
 
+const MORPH_DURATION = 400; // 입력창→버블 색상 전환 시간(ms)
+
 // HSL 랜덤 배경색 생성 (흰색 텍스트가 잘 읽히는 범위)
 function randomColor() {
   const h = Math.random() * 360;
@@ -11,43 +13,61 @@ function randomColor() {
   return `hsl(${h}, ${s}%, ${l}%)`;
 }
 
-// 버블 생성: DOM 요소 + Matter.js body
+// 버블 생성: 입력창 위에 겹쳐서 나타난 뒤 색이 변하며 떠오름
 export function createBubble(text, engine) {
   const area = document.getElementById('bubble-area');
-  const areaW = area.clientWidth;
-  const areaH = area.clientHeight;
+  const areaRect = area.getBoundingClientRect();
+  const input = document.getElementById('message-input');
+  const inputRect = input.getBoundingClientRect();
 
-  // DOM 요소 생성
+  const color = randomColor();
+
+  // DOM 요소 생성 — 처음에는 입력창과 동일한 외형
   const el = document.createElement('div');
   el.className = 'bubble';
   el.textContent = text;
-  el.style.cssText = `
+
+  // input과 동일한 타이포그래피를 computed style에서 복사
+  const inputStyle = getComputedStyle(input);
+  const baseStyle = `
     position: absolute;
-    padding: 10px 16px;
-    border-radius: 24px;
-    color: #fff;
-    font-size: 16px;
-    line-height: 1.4;
-    font-family: system-ui, -apple-system, sans-serif;
-    max-width: ${areaW * 0.6}px;
+    padding: ${inputStyle.paddingTop} ${inputStyle.paddingRight} ${inputStyle.paddingBottom} ${inputStyle.paddingLeft};
+    border-radius: ${inputStyle.borderRadius};
+    font-size: ${inputStyle.fontSize};
+    line-height: ${inputStyle.lineHeight};
+    font-family: ${inputStyle.fontFamily};
+    font-weight: ${inputStyle.fontWeight};
+    letter-spacing: ${inputStyle.letterSpacing};
+    max-width: ${areaRect.width * 0.6}px;
     word-wrap: break-word;
     white-space: pre-wrap;
     pointer-events: none;
     user-select: none;
     will-change: transform;
-    background: ${randomColor()};
+    z-index: 20;
+  `;
+
+  el.style.cssText = baseStyle + `
+    background: #fff;
+    color: #333;
+    border: 1px solid #ddd;
+    animation: bubble-appear 200ms ease-out;
+    transition: background ${MORPH_DURATION}ms ease,
+                color ${MORPH_DURATION}ms ease,
+                border-color ${MORPH_DURATION}ms ease;
     visibility: hidden;
   `;
 
-  // 치수 측정을 위해 임시 렌더링
+  // 치수 측정
   area.appendChild(el);
   const w = el.offsetWidth;
   const h = el.offsetHeight;
 
-  // Matter.js body 생성
-  const startX = areaW / 2 + (Math.random() - 0.5) * 60;
-  const startY = areaH - 80;
+  // 입력창 정확한 위치 (bubble-area 좌표계 기준)
+  const startX = inputRect.left - areaRect.left + w / 2;
+  const startY = inputRect.top - areaRect.top + inputRect.height / 2;
 
+  // Matter.js body — 처음부터 동적, 역중력으로 바로 떠오름
   const body = Bodies.rectangle(startX, startY, w, h, {
     chamfer: { radius: 24 },
     restitution: 0.3,
@@ -55,13 +75,19 @@ export function createBubble(text, engine) {
     frictionAir: 0.02,
   });
 
-  // 질량에 랜덤 편차 (떠오르는 속도 차이)
   Body.setMass(body, body.mass * (0.8 + Math.random() * 0.4));
-
+  Body.setVelocity(body, { x: 0, y: -3 });
   World.add(engine.world, body);
 
-  // 표시
+  // 입력창 위에 겹쳐서 표시
   el.style.visibility = 'visible';
+
+  // 다음 프레임에서 색상 전환 트리거 — 벗겨지듯 색이 입혀짐
+  requestAnimationFrame(() => {
+    el.style.background = color;
+    el.style.color = '#fff';
+    el.style.borderColor = 'transparent';
+  });
 
   const bubble = {
     element: el,
@@ -71,6 +97,11 @@ export function createBubble(text, engine) {
     phase: Math.random() * Math.PI * 2,
   };
   bubbles.push(bubble);
+
+  // 전환 완료 후 테두리 제거
+  setTimeout(() => {
+    el.style.border = 'none';
+  }, MORPH_DURATION);
 
   return bubble;
 }

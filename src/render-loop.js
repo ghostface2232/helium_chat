@@ -9,10 +9,9 @@ export function startRenderLoop() {
     for (const bubble of bubbles) {
       const { body, element, width, height, phase } = bubble;
 
-      // 바람 힘 (우→좌 기본 + sin 흔들림)
-      const wind = -0.0002 * body.mass;
+      // 좌우 흔들림 (바람 없이 sin 진동만)
       const sway = Math.sin(timestamp * 0.001 + phase) * 0.0001 * body.mass;
-      Body.applyForce(body, body.position, { x: wind + sway, y: 0 });
+      Body.applyForce(body, body.position, { x: sway, y: 0 });
 
       // 미세 토크 (기우뚱 효과)
       body.torque += Math.sin(timestamp * 0.002 + phase) * 0.00002 * body.mass;

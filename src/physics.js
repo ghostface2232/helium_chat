@@ -19,7 +19,7 @@ export function initPhysics() {
   const area = document.getElementById('bubble-area');
   const { clientWidth: w, clientHeight: h } = area;
 
-  engine = Engine.create({ gravity: { x: 0, y: -0.3 } });
+  engine = Engine.create({ gravity: { x: 0, y: -0.5 } });
 
   const walls = createWalls(w, h);
   World.add(engine.world, walls);
