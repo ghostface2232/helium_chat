@@ -17,27 +17,16 @@ export function initInput(onSend) {
     }
   }
 
-  const computedStyle = getComputedStyle(input);
-  const minHeight = parseFloat(computedStyle.minHeight) || 52;
-  const configuredRadius = parseFloat(computedStyle.borderTopLeftRadius) || 26;
-  // 최초 단일 높이 기준으로 반경을 고정해, 여러 줄로 늘어나도 둥근 사각 형태가 유지되게 함
-  const fixedRadius = Math.max(configuredRadius, minHeight / 2);
-
-  function applyFixedRadius() {
-    input.style.borderRadius = `${fixedRadius}px`;
-  }
-
   // textarea 높이 자동 조절
   function autoResize() {
     input.style.height = 'auto';
     const sh = input.scrollHeight;
     input.style.height = Math.min(sh, 200) + 'px';
-    applyFixedRadius();
   }
 
   input.addEventListener('input', autoResize);
 
-  // 초기 진입 시 고정 반경 적용
+  // 초기 진입 시 높이를 콘텐츠 기준으로 동기화
   autoResize();
 
   function handleSend() {
