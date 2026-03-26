@@ -12,6 +12,10 @@
   font-display: swap;
 }
 
+:root {
+  --stable-app-height: 100vh;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -19,7 +23,8 @@
 }
 
 html, body, #app {
-  height: 100%;
+  width: 100%;
+  height: var(--stable-app-height, 100%);
   overflow: hidden;
 }
 
@@ -27,6 +32,11 @@ body {
   background-color: #000;
   font-family: 'SF Pro KR', system-ui, -apple-system, sans-serif;
   color: #e5e5e5;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
 }
 
 #bubble-area {
