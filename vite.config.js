@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/helium-chat/',
+  base: '/helium_chat/',
 });
