@@ -30,6 +30,8 @@ export function initInput(onSend) {
     input.value = '';
     autoResize();
     setTimeout(() => { input.style.transform = ''; }, 50);
+    // 전송 후 키보드 유지 (모바일)
+    input.focus();
   }
 
   input.addEventListener('keydown', (e) => {

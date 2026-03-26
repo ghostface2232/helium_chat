@@ -22,6 +22,8 @@ export function initExplode() {
     const clickX = touch.clientX - rect.left;
     const clickY = touch.clientY - rect.top;
     applyExplosion(clickX, clickY);
+    // 버블 영역 터치 시 키보드 내리기
+    document.getElementById('message-input').blur();
   });
 }
 
