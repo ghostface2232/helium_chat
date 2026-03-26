@@ -6,7 +6,8 @@ import { startRenderLoop } from './render-loop.js';
 import { initExplode } from './explode.js';
 import { Body } from 'matter-js';
 
-const KEYBOARD_THRESHOLD = 120;
+const KEYBOARD_THRESHOLD = 100;
+const ORIENTATION_WIDTH_DELTA = 120;
 
 const { engine, walls } = initPhysics();
 startPhysics(engine);
@@ -14,7 +15,44 @@ startRenderLoop();
 
 let currentWalls = walls;
 let resizeTimer = null;
-let baselineLayoutHeight = window.innerHeight;
+let stableLayoutWidth = window.innerWidth;
+let stableLayoutHeight = window.innerHeight;
+let maxObservedHeight = window.innerHeight;
+
+function isEditableFocused() {
+  const active = document.activeElement;
+  if (!active) return false;
+
+  const tag = active.tagName;
+  return tag === 'TEXTAREA' || tag === 'INPUT' || active.isContentEditable;
+}
+
+function getKeyboardInset() {
+  if (!window.visualViewport) return 0;
+  return Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
+}
+
+function isKeyboardOpen() {
+  if (!window.visualViewport) return false;
+
+  const viewportBottom = window.visualViewport.height + window.visualViewport.offsetTop;
+  const deltaFromStable = stableLayoutHeight - viewportBottom;
+  const activeInput = isEditableFocused();
+  const compressedViewport = window.visualViewport.height < stableLayoutHeight - KEYBOARD_THRESHOLD;
+
+  return deltaFromStable > KEYBOARD_THRESHOLD || (activeInput && compressedViewport);
+}
+
+function applyStableAppHeight(height) {
+  document.documentElement.style.setProperty('--stable-app-height', `${height}px`);
+}
+
+function commitStableViewport(width, height) {
+  stableLayoutWidth = width;
+  stableLayoutHeight = height;
+  maxObservedHeight = Math.max(maxObservedHeight, height);
+  applyStableAppHeight(stableLayoutHeight);
+}
 
 function clampBubblesIntoBounds() {
   const area = document.getElementById('bubble-area');
@@ -37,27 +75,25 @@ function syncPhysicsBounds() {
   clampBubblesIntoBounds();
 }
 
-function getKeyboardInset() {
-  if (!window.visualViewport) return 0;
-  return Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
-}
-
-function isKeyboardOpen() {
-  if (!window.visualViewport) return false;
-
-  const keyboardDelta = baselineLayoutHeight - (window.visualViewport.height + window.visualViewport.offsetTop);
-  return keyboardDelta > KEYBOARD_THRESHOLD;
-}
+commitStableViewport(window.innerWidth, window.innerHeight);
 
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
+    const widthDelta = Math.abs(window.innerWidth - stableLayoutWidth);
+    const orientationChanged = widthDelta >= ORIENTATION_WIDTH_DELTA;
+
     // 키보드에 의한 시각 뷰포트 축소는 물리 월드 경계 변경에서 제외
     if (isKeyboardOpen()) {
       return;
     }
 
-    baselineLayoutHeight = window.innerHeight;
+    const shouldUseMaxHeight = window.innerHeight < maxObservedHeight - KEYBOARD_THRESHOLD;
+    const nextHeight = orientationChanged
+      ? window.innerHeight
+      : (shouldUseMaxHeight ? maxObservedHeight : window.innerHeight);
+
+    commitStableViewport(window.innerWidth, nextHeight);
     syncPhysicsBounds();
   }, 200);
 });
@@ -78,7 +114,7 @@ if (window.visualViewport) {
 
     // 키보드가 닫힌 안정 상태에서만 기준 높이 갱신
     if (!isKeyboardOpen()) {
-      baselineLayoutHeight = window.innerHeight;
+      commitStableViewport(window.innerWidth, window.innerHeight);
     }
   }
 
