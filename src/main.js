@@ -8,7 +8,7 @@ import { Body } from 'matter-js';
 
 const KEYBOARD_THRESHOLD = 100;
 const ORIENTATION_WIDTH_DELTA = 120;
-const VIEWPORT_SYNC_DEBOUNCE = 150;
+const VIEWPORT_SYNC_DEBOUNCE = 200;
 
 const { engine, walls } = initPhysics();
 startPhysics(engine);
@@ -18,11 +18,12 @@ let currentWalls = walls;
 let resizeTimer = null;
 let viewportSyncTimer = null;
 
+// --- 안정적인 전체화면 크기 추적 ---
 let stableLayoutWidth = getLayoutWidth();
 let stableLayoutHeight = getLayoutHeight();
 let maxObservedLayoutHeight = stableLayoutHeight;
 
-// 키보드가 닫힌 상태에서의 visual viewport 기준값
+// 키보드가 닫힌 상태에서의 visual viewport 전체 높이 (기준값)
 let keyboardReferenceHeight = window.visualViewport
   ? window.visualViewport.height + window.visualViewport.offsetTop
   : stableLayoutHeight;
@@ -38,14 +39,12 @@ function getLayoutHeight() {
 function isEditableFocused() {
   const active = document.activeElement;
   if (!active) return false;
-
   const tag = active.tagName;
   return tag === 'TEXTAREA' || tag === 'INPUT' || active.isContentEditable;
 }
 
 function getKeyboardInsetFromReference() {
   if (!window.visualViewport) return 0;
-
   const viewportBottom = window.visualViewport.height + window.visualViewport.offsetTop;
   return Math.max(0, keyboardReferenceHeight - viewportBottom);
 }
@@ -61,8 +60,7 @@ function isKeyboardOpen() {
   const insetFromReference = getKeyboardInsetFromReference();
   const compressedViewport =
     window.visualViewport.height < keyboardReferenceHeight - KEYBOARD_THRESHOLD;
-
-  // iOS Safari는 키보드 열림 시 offsetTop이 함께 변하는 경우가 있어 함께 체크
+  // iOS Safari에서 키보드 열림 시 offsetTop이 양수로 변하는 현상 감지
   const shiftedViewport = window.visualViewport.offsetTop > 0;
 
   return activeInput && (insetFromReference > KEYBOARD_THRESHOLD || compressedViewport || shiftedViewport);
@@ -81,6 +79,15 @@ function commitStableViewport(width, height) {
   }
 
   applyStableAppHeight(height);
+}
+
+// --- iOS 스크롤 봉쇄 ---
+// iOS Safari는 input focus 시 내부적으로 document를 스크롤하여
+// 포커스된 요소를 보이게 하려 함. 이를 강제로 원위치시킴.
+function forceScrollReset() {
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
 }
 
 function clampBubblesIntoBounds() {
@@ -107,11 +114,9 @@ function syncPhysicsBounds() {
 function updateKeyboardReferenceIfStable(orientationChanged = false) {
   if (!window.visualViewport) {
     if (orientationChanged) {
-      // 회전/대규모 가로폭 변경 시 no-visualViewport 기준 높이를 재설정
       maxObservedLayoutHeight = stableLayoutHeight;
       return;
     }
-
     if (!isEditableFocused()) {
       maxObservedLayoutHeight = Math.max(maxObservedLayoutHeight, getLayoutHeight());
     }
@@ -151,6 +156,7 @@ function syncViewportAndPhysics() {
   syncPhysicsBounds();
 }
 
+// 초기 안정 높이 설정
 commitStableViewport(stableLayoutWidth, stableLayoutHeight);
 
 window.addEventListener('resize', () => {
@@ -164,16 +170,21 @@ initInput((text) => {
 
 initExplode();
 
-// 소프트 키보드 대응: 입력바만 키보드 상단으로 올리고 물리 천장은 고정 유지
+// --- 소프트 키보드 대응 (visualViewport API 지원 환경) ---
+// 입력바만 키보드 상단으로 올리고 물리 천장은 고정 유지
 if (window.visualViewport) {
   const inputBar = document.getElementById('input-bar');
 
   function onViewportChange() {
+    // iOS가 스크롤시킨 것을 즉시 원위치
+    forceScrollReset();
+
     const keyboardInset = getKeyboardInsetFromReference();
     inputBar.style.transform = keyboardInset > 0 ? `translateY(-${keyboardInset}px)` : '';
 
     clearTimeout(viewportSyncTimer);
     viewportSyncTimer = setTimeout(() => {
+      forceScrollReset();
       if (!isKeyboardOpen() && !isEditableFocused()) {
         keyboardReferenceHeight = window.visualViewport.height + window.visualViewport.offsetTop;
       }
@@ -185,3 +196,26 @@ if (window.visualViewport) {
   visualViewport.addEventListener('scroll', onViewportChange);
   onViewportChange();
 }
+
+// --- iOS 스크롤 봉쇄: 추가 방어 레이어 ---
+// focus/blur, scroll 이벤트에서도 스크롤을 강제 리셋
+window.addEventListener('scroll', forceScrollReset, { passive: false });
+document.addEventListener('scroll', forceScrollReset, { passive: false });
+
+// 포커스 시 iOS가 스크롤하는 것을 requestAnimationFrame으로 즉시 복구
+document.addEventListener('focusin', () => {
+  requestAnimationFrame(forceScrollReset);
+  // iOS는 포커스 후 약간의 지연을 두고 스크롤하므로 여러 프레임에 걸쳐 리셋
+  setTimeout(forceScrollReset, 50);
+  setTimeout(forceScrollReset, 150);
+  setTimeout(forceScrollReset, 300);
+});
+
+// 키보드 닫힐 때 (blur) 스크롤 리셋 + 뷰포트 안정화
+document.addEventListener('focusout', () => {
+  forceScrollReset();
+  setTimeout(() => {
+    forceScrollReset();
+    syncViewportAndPhysics();
+  }, 300);
+});
