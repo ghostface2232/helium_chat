@@ -20,6 +20,7 @@ let viewportSyncTimer = null;
 
 let stableLayoutWidth = getLayoutWidth();
 let stableLayoutHeight = getLayoutHeight();
+let maxObservedLayoutHeight = stableLayoutHeight;
 
 // 키보드가 닫힌 상태에서의 visual viewport 기준값
 let keyboardReferenceHeight = window.visualViewport
@@ -50,7 +51,11 @@ function getKeyboardInsetFromReference() {
 }
 
 function isKeyboardOpen() {
-  if (!window.visualViewport) return false;
+  if (!window.visualViewport) {
+    const currentHeight = getLayoutHeight();
+    const shrunkFromMax = currentHeight < maxObservedLayoutHeight - KEYBOARD_THRESHOLD;
+    return isEditableFocused() && shrunkFromMax;
+  }
 
   const activeInput = isEditableFocused();
   const insetFromReference = getKeyboardInsetFromReference();
@@ -70,6 +75,11 @@ function applyStableAppHeight(height) {
 function commitStableViewport(width, height) {
   stableLayoutWidth = width;
   stableLayoutHeight = height;
+
+  if (window.visualViewport || !isEditableFocused()) {
+    maxObservedLayoutHeight = Math.max(maxObservedLayoutHeight, height);
+  }
+
   applyStableAppHeight(height);
 }
 
@@ -94,8 +104,21 @@ function syncPhysicsBounds() {
   clampBubblesIntoBounds();
 }
 
-function updateKeyboardReferenceIfStable() {
-  if (!window.visualViewport || isKeyboardOpen() || isEditableFocused()) return;
+function updateKeyboardReferenceIfStable(orientationChanged = false) {
+  if (!window.visualViewport) {
+    if (orientationChanged) {
+      // 회전/대규모 가로폭 변경 시 no-visualViewport 기준 높이를 재설정
+      maxObservedLayoutHeight = stableLayoutHeight;
+      return;
+    }
+
+    if (!isEditableFocused()) {
+      maxObservedLayoutHeight = Math.max(maxObservedLayoutHeight, getLayoutHeight());
+    }
+    return;
+  }
+
+  if (isKeyboardOpen() || isEditableFocused()) return;
 
   keyboardReferenceHeight = window.visualViewport.height + window.visualViewport.offsetTop;
 }
@@ -113,18 +136,18 @@ function syncViewportAndPhysics() {
 
   const sizeChanged = width !== stableLayoutWidth || height !== stableLayoutHeight;
   if (!sizeChanged) {
-    updateKeyboardReferenceIfStable();
+    updateKeyboardReferenceIfStable(orientationChanged);
     return;
   }
 
   // 모바일 브라우저 UI 변화(주소창 show/hide)로 인한 미세 흔들림 억제
   if (!orientationChanged && Math.abs(height - stableLayoutHeight) < KEYBOARD_THRESHOLD / 2 && widthDelta === 0) {
-    updateKeyboardReferenceIfStable();
+    updateKeyboardReferenceIfStable(orientationChanged);
     return;
   }
 
   commitStableViewport(width, height);
-  updateKeyboardReferenceIfStable();
+  updateKeyboardReferenceIfStable(orientationChanged);
   syncPhysicsBounds();
 }
 
