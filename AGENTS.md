@@ -8,7 +8,7 @@
 - Vite 8 (vanilla JS, 프레임워크 없음)
 - Matter.js 0.20.0 (2D 물리 엔진)
 - DOM 기반 렌더링 (Canvas 아님)
-- GitHub Pages 배포 (gh-pages, base: '/helium-chat/')
+- GitHub Pages 배포 (gh-pages, base: '/helium_chat/')
 
 ## 아키텍처 결정
 - 물리 시뮬레이션은 Matter.js Engine이 담당.
