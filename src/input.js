@@ -1,22 +1,17 @@
 // 입력 처리 모듈
-const PILL_RADIUS = '26px';
-const RECT_RADIUS = '18px';
-
 export function initInput(onSend) {
   const input = document.getElementById('message-input');
   const sendBtn = document.getElementById('send-btn');
 
-  // 초기 한 줄 높이를 실측
-  const singleLineHeight = input.scrollHeight;
+  // 초기 한 줄 높이를 실측 → 이 값의 절반을 항상 borderRadius로 사용
+  const pillRadius = input.scrollHeight / 2;
 
   // textarea 높이 자동 조절
   function autoResize() {
     input.style.height = 'auto';
     const sh = input.scrollHeight;
     input.style.height = Math.min(sh, 200) + 'px';
-    // 한 줄이면 pill, 여러 줄이면 rounded rect
-    const lines = Math.round(sh / singleLineHeight);
-    input.style.borderRadius = lines > 2 ? RECT_RADIUS : PILL_RADIUS;
+    input.style.borderRadius = pillRadius + 'px';
   }
 
   input.addEventListener('input', autoResize);

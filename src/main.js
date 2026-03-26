@@ -45,11 +45,29 @@ if (window.visualViewport) {
     const offset = window.innerHeight - visualViewport.height;
     inputBar.style.bottom = offset + 'px';
 
-    // 키보드에 맞춰 천장/벽 재배치 (버블이 화면 밖으로 사라지지 않도록)
+    const vpHeight = visualViewport.height;
+    const vpTop = visualViewport.offsetTop;
+
+    // 키보드에 맞춰 천장/벽 재배치
     currentWalls = resizePhysics(engine, currentWalls, {
-      height: visualViewport.height,
-      offsetTop: visualViewport.offsetTop
+      height: vpHeight,
+      offsetTop: vpTop
     });
+
+    // 경계 밖 버블을 새 영역 안으로 보정 + 속도 초기화 (키보드 반복 시 누적 가속 방지)
+    const area = document.getElementById('bubble-area');
+    const w = area.clientWidth;
+    for (const bubble of getBubbles()) {
+      const { body, width, height } = bubble;
+      const minY = vpTop + height / 2;
+      const maxY = vpTop + vpHeight - height / 2;
+      const x = Math.max(width / 2, Math.min(w - width / 2, body.position.x));
+      const y = Math.max(minY, Math.min(maxY, body.position.y));
+      if (x !== body.position.x || y !== body.position.y) {
+        Body.setPosition(body, { x, y });
+        Body.setVelocity(body, { x: 0, y: 0 });
+      }
+    }
   }
   visualViewport.addEventListener('resize', onViewportResize);
   visualViewport.addEventListener('scroll', onViewportResize);
