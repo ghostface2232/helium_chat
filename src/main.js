@@ -7,6 +7,7 @@ import { initExplode } from './explode.js';
 import { Body } from 'matter-js';
 
 const KEYBOARD_THRESHOLD = 100;
+const KEYBOARD_LOCK_INSET = 24;
 const ORIENTATION_WIDTH_DELTA = 120;
 const VIEWPORT_SYNC_DEBOUNCE = 150;
 
@@ -48,6 +49,31 @@ function shouldFreezeLayoutForKeyboard(orientationChanged = false) {
   // 입력 요소에 포커스가 있는 동안에는 키보드 세션으로 간주해 레이아웃을 고정한다.
   // 단, 회전(가로폭 급변) 시에는 월드 재계산을 허용한다.
   return keyboardLockActive && !orientationChanged;
+}
+
+function updateKeyboardLockState() {
+  const activeInput = isEditableFocused();
+  if (!activeInput) {
+    keyboardLockActive = false;
+    return;
+  }
+
+  if (!window.visualViewport) {
+    keyboardLockActive = getLayoutHeight() < maxObservedLayoutHeight - KEYBOARD_LOCK_INSET;
+    return;
+  }
+
+  const viewportBottom = window.visualViewport.height + window.visualViewport.offsetTop;
+  const insetFromReference = Math.max(0, keyboardReferenceHeight - viewportBottom);
+  const insetFromStable = Math.max(0, stableLayoutHeight - viewportBottom);
+  const compressedViewport = window.visualViewport.height < keyboardReferenceHeight - KEYBOARD_LOCK_INSET;
+
+  keyboardLockActive = (
+    insetFromReference > KEYBOARD_LOCK_INSET ||
+    insetFromStable > KEYBOARD_LOCK_INSET ||
+    compressedViewport ||
+    window.visualViewport.offsetTop > 0
+  );
 }
 
 function getKeyboardInsetFromReference() {
@@ -140,6 +166,8 @@ function updateKeyboardReferenceIfStable(orientationChanged = false) {
 }
 
 function syncViewportAndPhysics() {
+  updateKeyboardLockState();
+
   const width = getLayoutWidth();
   const height = getLayoutHeight();
   const widthDelta = Math.abs(width - stableLayoutWidth);
@@ -171,7 +199,8 @@ commitStableViewport(stableLayoutWidth, stableLayoutHeight);
 
 document.addEventListener('focusin', () => {
   if (!isEditableFocused()) return;
-  keyboardLockActive = true;
+  keyboardLockActive = false;
+  updateKeyboardLockState();
 });
 
 document.addEventListener('focusout', () => {
@@ -200,6 +229,8 @@ if (window.visualViewport) {
   const inputBar = document.getElementById('input-bar');
 
   function onViewportChange() {
+    updateKeyboardLockState();
+
     const keyboardInset = getKeyboardInsetFromReference();
     inputBar.style.transform = keyboardInset > 0 ? `translateY(-${keyboardInset}px)` : '';
 
