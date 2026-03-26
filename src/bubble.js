@@ -76,15 +76,12 @@ export function createBubble(text, engine) {
   // 입력창의 현재 색상을 복사 (라이트/다크 모드 대응)
   const inputBg = inputStyle.backgroundColor;
   const inputColor = inputStyle.color;
-  const inputBorder = inputStyle.borderColor;
 
   el.style.cssText = baseStyle + `
     background: ${inputBg};
     color: ${inputColor};
-    border: 1px solid ${inputBorder};
     transition: background 800ms cubic-bezier(0.25, 0.1, 0.25, 1),
                 color 800ms cubic-bezier(0.25, 0.1, 0.25, 1),
-                border-color 800ms cubic-bezier(0.25, 0.1, 0.25, 1),
                 box-shadow 800ms cubic-bezier(0.25, 0.1, 0.25, 1);
     visibility: hidden;
   `;
@@ -117,7 +114,6 @@ export function createBubble(text, engine) {
   requestAnimationFrame(() => {
     el.style.background = color;
     el.style.color = '#fff';
-    el.style.borderColor = 'transparent';
     el.style.boxShadow = `0 0 12px 3px ${glow}`;
   });
 

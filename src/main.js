@@ -3,6 +3,7 @@ import { initInput } from './input.js';
 import { initPhysics, startPhysics, resizePhysics } from './physics.js';
 import { createBubble } from './bubble.js';
 import { startRenderLoop } from './render-loop.js';
+import { initExplode } from './explode.js';
 
 const { engine, walls } = initPhysics();
 startPhysics(engine);
@@ -16,3 +17,5 @@ window.addEventListener('resize', () => {
 initInput((text) => {
   createBubble(text, engine);
 });
+
+initExplode();
