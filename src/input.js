@@ -17,18 +17,28 @@ export function initInput(onSend) {
     }
   }
 
-  // 초기 한 줄 높이를 실측 → 이 값의 절반을 항상 borderRadius로 사용
-  const pillRadius = input.scrollHeight / 2;
+  const computedStyle = getComputedStyle(input);
+  const minHeight = parseFloat(computedStyle.minHeight) || 52;
+  const configuredRadius = parseFloat(computedStyle.borderTopLeftRadius) || 26;
+  // 최초 단일 높이 기준으로 반경을 고정해, 여러 줄로 늘어나도 둥근 사각 형태가 유지되게 함
+  const fixedRadius = Math.max(configuredRadius, minHeight / 2);
+
+  function applyFixedRadius() {
+    input.style.borderRadius = `${fixedRadius}px`;
+  }
 
   // textarea 높이 자동 조절
   function autoResize() {
     input.style.height = 'auto';
     const sh = input.scrollHeight;
     input.style.height = Math.min(sh, 200) + 'px';
-    input.style.borderRadius = pillRadius + 'px';
+    applyFixedRadius();
   }
 
   input.addEventListener('input', autoResize);
+
+  // 초기 진입 시 고정 반경 적용
+  autoResize();
 
   function handleSend() {
     const text = input.value.trim();
