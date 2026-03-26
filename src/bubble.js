@@ -47,10 +47,15 @@ export function createBubble(text, engine) {
     z-index: 20;
   `;
 
+  // 입력창의 현재 색상을 복사 (라이트/다크 모드 대응)
+  const inputBg = inputStyle.backgroundColor;
+  const inputColor = inputStyle.color;
+  const inputBorder = inputStyle.borderColor;
+
   el.style.cssText = baseStyle + `
-    background: #fff;
-    color: #333;
-    border: 1px solid #ddd;
+    background: ${inputBg};
+    color: ${inputColor};
+    border: 1px solid ${inputBorder};
     animation: bubble-appear 200ms ease-out;
     transition: background ${MORPH_DURATION}ms ease,
                 color ${MORPH_DURATION}ms ease,
