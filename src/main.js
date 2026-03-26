@@ -37,3 +37,14 @@ initInput((text) => {
 });
 
 initExplode();
+
+// iOS Safari 소프트 키보드 대응
+if (window.visualViewport) {
+  const inputBar = document.getElementById('input-bar');
+  function onViewportResize() {
+    const offset = window.innerHeight - visualViewport.height;
+    inputBar.style.bottom = offset + 'px';
+  }
+  visualViewport.addEventListener('resize', onViewportResize);
+  visualViewport.addEventListener('scroll', onViewportResize);
+}
