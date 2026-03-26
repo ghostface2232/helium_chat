@@ -1,5 +1,5 @@
 // 입력 처리 모듈
-export function initInput() {
+export function initInput(onSend) {
   const input = document.getElementById('message-input');
   const sendBtn = document.getElementById('send-btn');
 
@@ -7,7 +7,7 @@ export function initInput() {
     const text = input.value.trim();
     if (!text) return;
 
-    console.log(text);
+    onSend(text);
     input.value = '';
   }
 
