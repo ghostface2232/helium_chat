@@ -12,17 +12,14 @@ startRenderLoop();
 
 let currentWalls = walls;
 let resizeTimer = null;
+let prevWidth = document.getElementById('bubble-area').clientWidth;
+let prevHeight = document.getElementById('bubble-area').clientHeight;
 
 // 텍스트 입력 포커스 중 높이만 줄어드는 리사이즈는 모바일 키보드로 간주
 function isKeyboardResize(w, h) {
-  const area = document.getElementById('bubble-area');
-  const prevW = area.dataset.prevWidth ? Number(area.dataset.prevWidth) : w;
-  const prevH = area.dataset.prevHeight ? Number(area.dataset.prevHeight) : h;
-  const widthSame = w === prevW;
-  const heightShrunk = h < prevH;
   const inputFocused = document.activeElement &&
     (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT');
-  return widthSame && heightShrunk && inputFocused;
+  return w === prevWidth && h < prevHeight && inputFocused;
 }
 
 window.addEventListener('resize', () => {
@@ -36,8 +33,8 @@ window.addEventListener('resize', () => {
     if (isKeyboardResize(w, h)) {
       return;
     }
-    area.dataset.prevWidth = w;
-    area.dataset.prevHeight = h;
+    prevWidth = w;
+    prevHeight = h;
 
     currentWalls = resizePhysics(engine, currentWalls);
 
