@@ -1,0 +1,68 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background-color: #f5f5f5;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+#bubble-area {
+  position: relative;
+  width: 100%;
+  height: calc(100% - 64px);
+  overflow: hidden;
+}
+
+#input-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #fff;
+  padding: 12px 16px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  gap: 8px;
+  box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.06);
+}
+
+#message-input {
+  flex: 1;
+  border-radius: 24px;
+  border: 1px solid #ddd;
+  padding: 10px 16px;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+#message-input:focus {
+  border-color: #999;
+}
+
+#send-btn {
+  background-color: #333;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+}
+
+#send-btn:hover {
+  background-color: #555;
+}
