@@ -47,11 +47,3 @@ export function resizePhysics(eng, oldWalls, viewport) {
 
   return newWalls;
 }
-
-export function getEngine() {
-  return engine;
-}
-
-export function getWorld() {
-  return engine ? engine.world : null;
-}

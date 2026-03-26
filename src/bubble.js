@@ -3,8 +3,6 @@ import { Bodies, Body, World } from 'matter-js';
 
 const bubbles = [];
 
-const MORPH_DURATION = 400; // 입력창→버블 색상 전환 시간(ms)
-
 // 채도 높아 보이는 hue 대역 (탁해 보이는 노랑~황녹 제외)
 const VIVID_HUES = [
   [0, 30],     // 빨강~주황
@@ -13,7 +11,6 @@ const VIVID_HUES = [
   [70, 170],   // 초록~청록
   [30, 70],    // 주황~연두
 ];
-const HUE_RANGES = VIVID_HUES.flat();
 let lastHue = -1;
 const MIN_HUE_SHIFT = 60;
 
@@ -125,7 +122,6 @@ export function createBubble(text, engine) {
     phase: Math.random() * Math.PI * 2,
   };
   bubbles.push(bubble);
-
 
   return bubble;
 }

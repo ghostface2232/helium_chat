@@ -2,6 +2,20 @@
 export function initInput(onSend) {
   const input = document.getElementById('message-input');
   const sendBtn = document.getElementById('send-btn');
+  const uiRoot = document.getElementById('ui-root');
+  const isIosTouchDevice = (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+  let lastTouchEndAt = 0;
+
+  function focusInputWithoutScroll() {
+    try {
+      input.focus({ preventScroll: true });
+    } catch {
+      input.focus();
+    }
+  }
 
   // 초기 한 줄 높이를 실측 → 이 값의 절반을 항상 borderRadius로 사용
   const pillRadius = input.scrollHeight / 2;
@@ -26,7 +40,7 @@ export function initInput(onSend) {
     autoResize();
     setTimeout(() => { input.style.transform = ''; }, 50);
     // 전송 후 키보드 유지 (모바일)
-    input.focus();
+    focusInputWithoutScroll();
   }
 
   input.addEventListener('keydown', (e) => {
@@ -37,6 +51,43 @@ export function initInput(onSend) {
   });
 
   sendBtn.addEventListener('click', handleSend);
+
+  // iOS Safari가 최초 포커스 시 textarea를 보이게 하려고 viewport를 밀지 않도록 차단
+  if (isIosTouchDevice) {
+    input.addEventListener('touchstart', (e) => {
+      if (document.activeElement === input) return;
+
+      e.preventDefault();
+      focusInputWithoutScroll();
+
+      if (!input.value) {
+        input.setSelectionRange(0, 0);
+      }
+    }, { passive: false });
+
+    // Safari의 핀치 줌과 더블탭 확대를 차단해 입력 중 화면 스케일이 흔들리지 않게 유지
+    document.addEventListener('gesturestart', (e) => {
+      e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('gesturechange', (e) => {
+      e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('gestureend', (e) => {
+      e.preventDefault();
+    }, { passive: false });
+
+    uiRoot.addEventListener('touchend', (e) => {
+      if (e.target === input) return;
+
+      const now = performance.now();
+      if (now - lastTouchEndAt < 300) {
+        e.preventDefault();
+      }
+      lastTouchEndAt = now;
+    }, { passive: false });
+  }
 
   // 마우스 위치를 따라다니는 국소 glow
   let glowX = 0, glowY = 0;

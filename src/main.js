@@ -8,11 +8,17 @@ import { Body } from 'matter-js';
 
 const KEYBOARD_THRESHOLD = 100;
 const VIEWPORT_SYNC_DEBOUNCE = 120;
+const ORIENTATION_SYNC_DEBOUNCE = 220;
 
-function getViewportSize() {
+const inputBar = document.getElementById('input-bar');
+const inputBarInner = document.getElementById('input-bar-inner');
+
+function getWorldViewportSize() {
+  const root = document.documentElement;
+
   return {
-    width: window.innerWidth,
-    height: window.innerHeight,
+    width: root.clientWidth || window.innerWidth,
+    height: root.clientHeight || window.innerHeight,
   };
 }
 
@@ -24,38 +30,44 @@ function isEditableFocused() {
   return tag === 'TEXTAREA' || tag === 'INPUT' || active.isContentEditable;
 }
 
-let stableViewport = getViewportSize();
-const { engine, walls } = initPhysics(stableViewport);
+function applyWorldViewport(viewport) {
+  document.documentElement.style.setProperty('--world-viewport-width', `${viewport.width}px`);
+  document.documentElement.style.setProperty('--world-viewport-height', `${viewport.height}px`);
+}
+
+function getVisibleViewportBottom() {
+  if (window.visualViewport) {
+    return window.visualViewport.height + window.visualViewport.offsetTop;
+  }
+
+  return window.innerHeight;
+}
+
+let worldViewport = getWorldViewportSize();
+applyWorldViewport(worldViewport);
+
+const { engine, walls } = initPhysics(worldViewport);
 startPhysics(engine);
 startRenderLoop();
 
 let currentWalls = walls;
 let resizeTimer = null;
-let viewportSyncTimer = null;
+let keyboardSettleTimer = null;
+let orientationTimer = null;
+let keyboardSessionActive = false;
+let inputBarTrackingFrame = null;
+let keyboardChromeActive = false;
 
-// 키보드가 닫혀 있을 때의 visualViewport 하단 좌표를 기준점으로 유지
-let keyboardReferenceBottom = window.visualViewport
-  ? window.visualViewport.height + window.visualViewport.offsetTop
-  : stableViewport.height;
-
-function getKeyboardInset() {
-  if (!window.visualViewport) return 0;
-  const viewportBottom = window.visualViewport.height + window.visualViewport.offsetTop;
-  return Math.max(0, keyboardReferenceBottom - viewportBottom);
+function getKeyboardLift() {
+  return Math.max(0, worldViewport.height - getVisibleViewportBottom());
 }
 
-function isKeyboardOpen() {
-  if (!window.visualViewport) {
-    return isEditableFocused() && (window.innerHeight < stableViewport.height - KEYBOARD_THRESHOLD);
-  }
-
-  const keyboardInset = getKeyboardInset();
-  const compressedViewport = window.visualViewport.height < keyboardReferenceBottom - KEYBOARD_THRESHOLD;
-  return isEditableFocused() && (keyboardInset > KEYBOARD_THRESHOLD || compressedViewport);
+function isKeyboardCompressed() {
+  return getKeyboardLift() > KEYBOARD_THRESHOLD;
 }
 
 function clampBubblesIntoBounds() {
-  const { width, height } = stableViewport;
+  const { width, height } = worldViewport;
 
   for (const bubble of getBubbles()) {
     const { body, width: bubbleWidth, height: bubbleHeight } = bubble;
@@ -69,52 +81,156 @@ function clampBubblesIntoBounds() {
 }
 
 function syncPhysicsBounds() {
-  currentWalls = resizePhysics(engine, currentWalls, stableViewport);
+  currentWalls = resizePhysics(engine, currentWalls, worldViewport);
   clampBubblesIntoBounds();
 }
 
-function commitStableViewport(nextViewport) {
-  stableViewport = nextViewport;
+function commitWorldViewport(nextViewport) {
+  worldViewport = nextViewport;
+  applyWorldViewport(nextViewport);
   syncPhysicsBounds();
 }
 
-function syncViewportAndPhysics() {
-  const nextViewport = getViewportSize();
+function syncWorldViewport(options = {}) {
+  const { force = false } = options;
+  const nextViewport = getWorldViewportSize();
   const sizeChanged = (
-    nextViewport.width !== stableViewport.width ||
-    nextViewport.height !== stableViewport.height
+    nextViewport.width !== worldViewport.width ||
+    nextViewport.height !== worldViewport.height
   );
 
   if (!sizeChanged) {
-    if (window.visualViewport && !isEditableFocused()) {
-      keyboardReferenceBottom = window.visualViewport.height + window.visualViewport.offsetTop;
+    return;
+  }
+
+  // 키보드 세션 중에는 world를 절대 재배치하지 않는다
+  if (!force && keyboardSessionActive && nextViewport.width === worldViewport.width) {
+    return;
+  }
+
+  commitWorldViewport(nextViewport);
+}
+
+function syncInputBarPosition() {
+  const keyboardLift = getKeyboardLift();
+  const isKeyboardActive = keyboardLift > KEYBOARD_THRESHOLD;
+
+  inputBar.style.transform = keyboardLift > KEYBOARD_THRESHOLD
+    ? `translate3d(0, -${keyboardLift}px, 0)`
+    : 'translate3d(0, 0, 0)';
+
+  if (keyboardChromeActive !== isKeyboardActive) {
+    keyboardChromeActive = isKeyboardActive;
+    animateInputBarChrome(isKeyboardActive);
+  }
+}
+
+function animateInputBarChrome(isKeyboardActive) {
+  if (!inputBarInner) return;
+
+  if (typeof inputBarInner.getAnimations === 'function') {
+    for (const animation of inputBarInner.getAnimations()) {
+      animation.cancel();
     }
+  }
+
+  const keyframes = isKeyboardActive
+    ? [
+        { transform: 'translate3d(0, 14px, 0) scale(0.955)', opacity: 0.88, offset: 0 },
+        { transform: 'translate3d(0, -3px, 0) scale(1.01)', opacity: 1, offset: 0.72 },
+        { transform: 'translate3d(0, 0, 0) scale(1)', opacity: 1, offset: 1 },
+      ]
+    : [
+        { transform: 'translate3d(0, -6px, 0) scale(1.01)', opacity: 1, offset: 0 },
+        { transform: 'translate3d(0, 2px, 0) scale(0.992)', opacity: 1, offset: 0.7 },
+        { transform: 'translate3d(0, 0, 0) scale(1)', opacity: 1, offset: 1 },
+      ];
+
+  if (typeof inputBarInner.animate === 'function') {
+    inputBarInner.animate(keyframes, {
+      duration: isKeyboardActive ? 240 : 180,
+      easing: 'linear',
+      fill: 'both',
+    });
     return;
   }
 
-  // 키보드 세션에서는 벽을 절대 재배치하지 않는다
-  if (isKeyboardOpen()) {
+  inputBarInner.style.transform = 'translate3d(0, 0, 0) scale(1)';
+  inputBarInner.style.opacity = '1';
+}
+
+function stopInputBarTracking() {
+  if (inputBarTrackingFrame !== null) {
+    cancelAnimationFrame(inputBarTrackingFrame);
+    inputBarTrackingFrame = null;
+  }
+}
+
+function startInputBarTracking() {
+  if (inputBarTrackingFrame !== null || !window.visualViewport) {
     return;
   }
 
-  commitStableViewport(nextViewport);
+  const tick = () => {
+    syncInputBarPosition();
 
-  if (window.visualViewport && !isEditableFocused()) {
-    keyboardReferenceBottom = window.visualViewport.height + window.visualViewport.offsetTop;
-  }
+    if (keyboardSessionActive || isKeyboardCompressed() || isEditableFocused()) {
+      inputBarTrackingFrame = requestAnimationFrame(tick);
+      return;
+    }
+
+    inputBarTrackingFrame = null;
+  };
+
+  inputBarTrackingFrame = requestAnimationFrame(tick);
+}
+
+function scheduleKeyboardSettle() {
+  clearTimeout(keyboardSettleTimer);
+  keyboardSettleTimer = setTimeout(() => {
+    if (isKeyboardCompressed()) {
+      return;
+    }
+
+    if (!isEditableFocused()) {
+      keyboardSessionActive = false;
+    }
+
+    stopInputBarTracking();
+    syncWorldViewport();
+    syncInputBarPosition();
+  }, VIEWPORT_SYNC_DEBOUNCE);
 }
 
 document.addEventListener('focusout', () => {
   requestAnimationFrame(() => {
-    if (!isEditableFocused()) {
-      syncViewportAndPhysics();
+    syncInputBarPosition();
+
+    if (!window.visualViewport) {
+      keyboardSessionActive = false;
+      syncWorldViewport();
+      return;
     }
+
+    scheduleKeyboardSettle();
   });
+});
+
+document.addEventListener('focusin', () => {
+  if (window.visualViewport && isEditableFocused()) {
+    keyboardSessionActive = true;
+    startInputBarTracking();
+  }
+
+  syncInputBarPosition();
 });
 
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(syncViewportAndPhysics, 120);
+  resizeTimer = setTimeout(() => {
+    syncWorldViewport();
+    syncInputBarPosition();
+  }, VIEWPORT_SYNC_DEBOUNCE);
 });
 
 initInput((text) => {
@@ -123,24 +239,30 @@ initInput((text) => {
 
 initExplode();
 
-// 소프트 키보드 대응: 입력바만 키보드 상단으로 이동, 물리 월드는 고정
 if (window.visualViewport) {
-  const inputBar = document.getElementById('input-bar');
-
   function onViewportChange() {
-    const keyboardInset = getKeyboardInset();
-    inputBar.style.transform = keyboardInset > 0 ? `translateY(-${keyboardInset}px)` : '';
+    syncInputBarPosition();
 
-    clearTimeout(viewportSyncTimer);
-    viewportSyncTimer = setTimeout(() => {
-      if (!isKeyboardOpen() && !isEditableFocused()) {
-        keyboardReferenceBottom = window.visualViewport.height + window.visualViewport.offsetTop;
-      }
-      syncViewportAndPhysics();
-    }, VIEWPORT_SYNC_DEBOUNCE);
+    if (isKeyboardCompressed()) {
+      keyboardSessionActive = true;
+      startInputBarTracking();
+      clearTimeout(keyboardSettleTimer);
+      return;
+    }
+
+    scheduleKeyboardSettle();
   }
 
-  visualViewport.addEventListener('resize', onViewportChange);
-  visualViewport.addEventListener('scroll', onViewportChange);
+  window.visualViewport.addEventListener('resize', onViewportChange);
+  window.visualViewport.addEventListener('scroll', onViewportChange);
   onViewportChange();
 }
+
+window.addEventListener('orientationchange', () => {
+  clearTimeout(orientationTimer);
+  orientationTimer = setTimeout(() => {
+    keyboardSessionActive = false;
+    syncWorldViewport({ force: true });
+    syncInputBarPosition();
+  }, ORIENTATION_SYNC_DEBOUNCE);
+});

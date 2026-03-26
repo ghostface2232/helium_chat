@@ -8,9 +8,9 @@ const EXPLODE_FORCE = IS_MOBILE ? 0.04 : 0.08;
 
 export function initExplode() {
   const area = document.getElementById('bubble-area');
-  const areaRect = area.getBoundingClientRect();
 
   area.addEventListener('mousedown', (e) => {
+    const areaRect = area.getBoundingClientRect();
     const clickX = e.clientX - areaRect.left;
     const clickY = e.clientY - areaRect.top;
     applyExplosion(clickX, clickY);
