@@ -32,6 +32,7 @@ body {
   background-color: #000;
   font-family: 'SF Pro KR', system-ui, -apple-system, sans-serif;
   color: #e5e5e5;
+  overscroll-behavior: none;
 }
 
 #app {
