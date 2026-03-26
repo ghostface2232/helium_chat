@@ -44,6 +44,12 @@ if (window.visualViewport) {
   function onViewportResize() {
     const offset = window.innerHeight - visualViewport.height;
     inputBar.style.bottom = offset + 'px';
+
+    // 키보드에 맞춰 천장/벽 재배치 (버블이 화면 밖으로 사라지지 않도록)
+    currentWalls = resizePhysics(engine, currentWalls, {
+      height: visualViewport.height,
+      offsetTop: visualViewport.offsetTop
+    });
   }
   visualViewport.addEventListener('resize', onViewportResize);
   visualViewport.addEventListener('scroll', onViewportResize);
