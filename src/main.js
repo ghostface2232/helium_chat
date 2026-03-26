@@ -12,33 +12,15 @@ startRenderLoop();
 
 let currentWalls = walls;
 let resizeTimer = null;
-let prevWidth = document.getElementById('bubble-area').clientWidth;
-let prevHeight = document.getElementById('bubble-area').clientHeight;
-
-// 텍스트 입력 포커스 중 높이만 줄어드는 리사이즈는 모바일 키보드로 간주
-function isKeyboardResize(w, h) {
-  const inputFocused = document.activeElement &&
-    (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT');
-  return w === prevWidth && h < prevHeight && inputFocused;
-}
-
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
-    const area = document.getElementById('bubble-area');
-    const w = area.clientWidth;
-    const h = area.clientHeight;
-
-    // 모바일 키보드에 의한 높이 축소 → 물리 월드 변경 건너뜀
-    if (isKeyboardResize(w, h)) {
-      return;
-    }
-    prevWidth = w;
-    prevHeight = h;
-
     currentWalls = resizePhysics(engine, currentWalls);
 
     // 경계 밖 버블을 안쪽으로 보정
+    const area = document.getElementById('bubble-area');
+    const w = area.clientWidth;
+    const h = area.clientHeight;
     for (const bubble of getBubbles()) {
       const { body, width, height } = bubble;
       const x = Math.max(width / 2, Math.min(w - width / 2, body.position.x));
@@ -56,13 +38,36 @@ initInput((text) => {
 
 initExplode();
 
-// iOS Safari 소프트 키보드 대응 — input bar 위치만 조정, 물리 월드는 변경하지 않음
-// 버블은 역중력으로 항상 화면 최상단에 쌓이므로 키보드 영역과 충돌하지 않음
+// iOS Safari 소프트 키보드 대응
 if (window.visualViewport) {
   const inputBar = document.getElementById('input-bar');
   function onViewportResize() {
-    const offset = window.innerHeight - visualViewport.height - visualViewport.offsetTop;
+    const offset = window.innerHeight - visualViewport.height;
     inputBar.style.bottom = offset + 'px';
+
+    const vpHeight = visualViewport.height;
+    const vpTop = visualViewport.offsetTop;
+
+    // 키보드에 맞춰 천장/벽 재배치
+    currentWalls = resizePhysics(engine, currentWalls, {
+      height: vpHeight,
+      offsetTop: vpTop
+    });
+
+    // 경계 밖 버블을 새 영역 안으로 보정 + 속도 초기화 (키보드 반복 시 누적 가속 방지)
+    const area = document.getElementById('bubble-area');
+    const w = area.clientWidth;
+    for (const bubble of getBubbles()) {
+      const { body, width, height } = bubble;
+      const minY = vpTop + height / 2;
+      const maxY = vpTop + vpHeight - height / 2;
+      const x = Math.max(width / 2, Math.min(w - width / 2, body.position.x));
+      const y = Math.max(minY, Math.min(maxY, body.position.y));
+      if (x !== body.position.x || y !== body.position.y) {
+        Body.setPosition(body, { x, y });
+        Body.setVelocity(body, { x: 0, y: 0 });
+      }
+    }
   }
   visualViewport.addEventListener('resize', onViewportResize);
   visualViewport.addEventListener('scroll', onViewportResize);
